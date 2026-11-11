@@ -25,6 +25,7 @@ DIR = Path("journal")
 DAYS, SIGNALS = DIR / "days.csv", DIR / "signals.csv"
 KST = ZoneInfo("Asia/Seoul")
 OUTCOME_COLS = ["결과일", "시가", "저가", "종가_익일", "손절가", "청산가", "결과", "수익%"]
+SIGNAL_COLS = ["기준일", "전략", "코드", "종목", "점수", "종가", "등락%", "ATR", "투매일"] + OUTCOME_COLS
 
 
 def _read(path: Path) -> pd.DataFrame:
@@ -62,14 +63,18 @@ def record(results: list[Result], strategy: str, threshold: float,
 
     picks = [r for r in results if r.score >= threshold and r.date == day and r.chg_pct < 29]
     sig = _read(SIGNALS)
-    if len(sig):
+    if sig.empty:
+        sig = pd.DataFrame(columns=SIGNAL_COLS)  # 첫 실행: 빈 표라도 컬럼은 갖춘다
+    else:
         sig = sig[~((sig["기준일"] == day) & (sig["전략"] == strategy))]
-    new = pd.DataFrame([{
+    new = pd.DataFrame(columns=SIGNAL_COLS, data=[{
         "기준일": day, "전략": strategy, "코드": r.code, "종목": r.name, "점수": r.score,
         "종가": r.close, "등락%": round(r.chg_pct, 2), "ATR": round(r.plan["손절폭"] / STOP_ATR, 4),
         "투매일": bool(panic), **{c: None for c in OUTCOME_COLS}} for r in picks])
-    _write(pd.concat([sig, new]).sort_values(["기준일", "전략", "점수"], ascending=[True, True, False]),
-           SIGNALS)
+    merged = pd.concat([x for x in (sig, new) if len(x)]) if len(sig) or len(new) else sig
+    if len(merged):
+        merged = merged.sort_values(["기준일", "전략", "점수"], ascending=[True, True, False])
+    _write(merged, SIGNALS)
     return len(picks), day
 
 
