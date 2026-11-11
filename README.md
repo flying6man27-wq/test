@@ -7,6 +7,7 @@
 |---|---|
 | 내가 고른 종목 분석 | `python main.py analyze 삼성전자 000660 에코프로` |
 | 전 종목 스캔 → 시장 상태 판정 + 추천 | `python main.py scan` |
+| **대시보드** (오늘 판정·추천·누적 성적을 브라우저로) | `python main.py dashboard` 또는 `대시보드열기.bat` |
 | 전진 검증 (기록한 신호의 실제 다음날 결과) | `python main.py track` |
 | 점수 체계 검증 (과거 데이터) | `python main.py validate` |
 
@@ -20,11 +21,14 @@ pip install -r requirements.txt
 - **장 마감(15:30) 이후 실행**하세요. 장중에는 당일 캔들이 미완성입니다.
 
 ## 매일 쓰는 법 (권장)
-장 마감 후(16시 이후) 아래 두 줄을 실행하거나, `run_daily.bat`(Windows) / `run_daily.sh`(Mac·리눅스)를 실행하세요.
+장 마감 후(16시 이후) **`run_daily.bat`을 더블클릭**하세요(Mac·리눅스는 `run_daily.sh`). 끝나면 **브라우저에 대시보드가 자동으로 열립니다.**
 ```bash
-python main.py track   # 지난 신호들의 실제 결과 채우기 + 누적 성적
-python main.py scan    # 오늘 시장 상태 판정 + 추천 + 기록
+python main.py track       # 지난 신호들의 실제 결과 채우기 + 누적 성적
+python main.py scan        # 오늘 시장 상태 판정 + 추천 + 기록
+python main.py dashboard   # 대시보드(reports/dashboard.html) 열기
 ```
+- 대시보드에는 오늘의 판정(✅ 매매일 / ⛔ 쉬는 날), 추천 종목, 최근 60일 시장 신호 비율 그래프, 전진 검증 성적이 한 화면에 나옵니다.
+- 나중에 다시 보려면 `대시보드열기.bat`을 더블클릭하거나 `reports/dashboard.html`을 브라우저로 여세요.
 - `scan`을 실행할 때마다 `journal/` 폴더에 그날의 시장 상태와 신호 종목이 자동으로 기록됩니다.
   장 마감(15:40) 전에는 캔들이 미완성이므로 기록하지 않습니다.
 - `track`은 기록된 신호의 **다음 거래일 실제 시가·저가·종가**를 가져와, 백테스트와 같은 규칙으로 수익을 계산합니다.
@@ -126,6 +130,8 @@ daytrader/analyzer.py    종목 1개 분석
 daytrader/scanner.py     전 종목 스캔, 시장 상태(투매일) 판정
 daytrader/validate.py    전략 검증 (점수구간·기간·연도·신호비율별)
 daytrader/journal.py     전진 검증 기록(journal/) 및 다음날 결과 채우기
+daytrader/dashboard.py   대시보드 HTML (reports/dashboard.html)
 daytrader/report.py      콘솔 / CSV / HTML 출력
-run_daily.bat / .sh      매일 실행용 (track → scan)
+run_daily.bat / .sh      매일 실행용 (track → scan → dashboard)
+대시보드열기.bat          대시보드만 다시 열기
 ```

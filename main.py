@@ -9,6 +9,9 @@
     python main.py scan                      # 거래대금 상위 300개 스캔 → 시장 상태 판정 + 추천
     python main.py scan --market KOSDAQ --top 30
 
+  대시보드 - 오늘 판정·추천·누적 성적을 브라우저로
+    python main.py dashboard
+
   전진 검증 - scan 기록과 다음날 실제 결과 비교 (매일 scan 후 누적)
     python main.py track
 
@@ -23,7 +26,7 @@ import sys
 
 import pandas as pd
 
-from daytrader import journal, report, strategy, validate
+from daytrader import dashboard, journal, report, strategy, validate
 from daytrader.analyzer import analyze
 from daytrader.scanner import PANIC_SHARE, market_state, scan
 
@@ -86,8 +89,10 @@ def cmd_scan(a, st, th) -> None:
     if a.save and picks:
         csv, htm = report.save(picks[: a.top], f"추천종목_{a.market}")
         print(f"저장: {csv}\n      {htm}")
-    if a.journal and results:
+    if results:
         day = max(r.date for r in results)
+        dashboard.save_latest(results, st.name, th, share, panic, journal.bar_is_final(day))
+    if a.journal and results:
         if journal.bar_is_final(day) or a.force:
             n, day = journal.record(results, st.name, th, share, panic)
             print(f"\n📒 전진 검증 기록: {day} · 신호 {n}종목 → journal/ (다음날 장 마감 후 track으로 결과 확인)")
@@ -114,6 +119,11 @@ def cmd_track(a, st, th) -> None:
     if s["최근"] is not None:
         print("\n[최근 결과]")
         print(s["최근"].to_string(index=False))
+
+
+def cmd_dashboard(a, st, th) -> None:
+    path = dashboard.build(open_browser=not a.no_open)
+    print(f"대시보드: {path.resolve()}")
 
 
 def cmd_validate(a, st, th) -> None:
@@ -165,6 +175,10 @@ def main() -> None:
 
     s4 = sub.add_parser("track", help="전진 검증: 기록한 신호의 다음날 실제 결과 확인")
     s4.set_defaults(func=cmd_track)
+
+    s5 = sub.add_parser("dashboard", help="오늘 판정·추천·누적 성적을 브라우저 대시보드로 보기")
+    s5.add_argument("--no-open", action="store_true", help="브라우저를 자동으로 열지 않음")
+    s5.set_defaults(func=cmd_dashboard)
 
     s3 = sub.add_parser("validate", help="점수 체계가 실제로 통하는지 과거 데이터로 검증")
     s3.add_argument("--market", default="ALL", choices=["ALL", "KOSPI", "KOSDAQ"])

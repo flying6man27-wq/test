@@ -3,3 +3,4 @@
 cd "$(dirname "$0")"
 python3 main.py track
 python3 main.py scan
+python3 main.py dashboard
