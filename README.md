@@ -7,7 +7,8 @@
 |---|---|
 | 내가 고른 종목 분석 | `python main.py analyze 삼성전자 000660 에코프로` |
 | 전 종목 스캔 → 시장 상태 판정 + 추천 | `python main.py scan` |
-| 점수 체계 검증 | `python main.py validate` |
+| 전진 검증 (기록한 신호의 실제 다음날 결과) | `python main.py track` |
+| 점수 체계 검증 (과거 데이터) | `python main.py validate` |
 
 > 본 프로그램은 참고용이며 수익을 보장하지 않습니다. 실제 매매 전 소액·모의 매매로 먼저 확인하세요.
 
@@ -17,6 +18,21 @@ pip install -r requirements.txt
 ```
 - 데이터: [FinanceDataReader](https://github.com/FinanceData/FinanceDataReader) (국내 KRX 무료 시세 + 미국 주식)
 - **장 마감(15:30) 이후 실행**하세요. 장중에는 당일 캔들이 미완성입니다.
+
+## 매일 쓰는 법 (권장)
+장 마감 후(16시 이후) 아래 두 줄을 실행하거나, `run_daily.bat`(Windows) / `run_daily.sh`(Mac·리눅스)를 실행하세요.
+```bash
+python main.py track   # 지난 신호들의 실제 결과 채우기 + 누적 성적
+python main.py scan    # 오늘 시장 상태 판정 + 추천 + 기록
+```
+- `scan`을 실행할 때마다 `journal/` 폴더에 그날의 시장 상태와 신호 종목이 자동으로 기록됩니다.
+  장 마감(15:40) 전에는 캔들이 미완성이므로 기록하지 않습니다.
+- `track`은 기록된 신호의 **다음 거래일 실제 시가·저가·종가**를 가져와, 백테스트와 같은 규칙으로 수익을 계산합니다.
+  결과는 **투매일 신호와 평상시 신호를 나눠서** 보여 주므로, "투매일에만 매매" 규칙이 앞으로도 통하는지 확인할 수 있습니다.
+- `journal/signals.csv`는 엑셀로 바로 열 수 있습니다.
+- **자동화**: Windows 작업 스케줄러에 `run_daily.bat`을 평일 16:00로 등록하면 매일 자동으로 기록됩니다.
+
+> 투매일은 1년에 8번 정도뿐입니다. **투매일 거래가 30건 이상 쌓일 때까지(수개월)는 실제 돈을 넣지 말고 기록만 보시길 권합니다.**
 
 ## 전략: 과매도 반등형 (기본, `reversal`)
 
@@ -95,7 +111,7 @@ python main.py --threshold 70 scan               # 추천 기준 점수 변경
 - 전략을 바꾸려면 `daytrader/strategy.py`의 `signals` 가중치를 고치세요. **고친 뒤에는 반드시 `validate`를 다시 실행하세요.**
 
 ## 다음 단계 제안
-1. **전진 검증**: 매일 스캔 결과를 기록해 실제 다음날 성과와 자동 비교합니다. 과거 검증의 한계를 보완하는 가장 확실한 방법입니다.
+1. ~~전진 검증~~ → `track` 명령으로 구현 완료
 2. 분봉 데이터 연동 (증권사 API): 장중 손절 순서와 체결가를 정확히 반영합니다.
 3. 매일 장 마감 후 자동 스캔과 알림.
 
@@ -109,5 +125,7 @@ daytrader/backtest.py    다음날 시가매수·종가매도 백테스트 (손�
 daytrader/analyzer.py    종목 1개 분석
 daytrader/scanner.py     전 종목 스캔, 시장 상태(투매일) 판정
 daytrader/validate.py    전략 검증 (점수구간·기간·연도·신호비율별)
+daytrader/journal.py     전진 검증 기록(journal/) 및 다음날 결과 채우기
 daytrader/report.py      콘솔 / CSV / HTML 출력
+run_daily.bat / .sh      매일 실행용 (track → scan)
 ```
