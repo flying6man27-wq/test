@@ -10,7 +10,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from daytrader import __version__, dashboard, data, journal, paper, strategy
+import daytrader
+from daytrader import dashboard, data, journal, paper, strategy
 from daytrader.analyzer import analyze_df
 from daytrader.indicators import add_indicators
 from daytrader.report import DISCLAIMER
@@ -91,7 +92,7 @@ def load_latest():
 # ── 사이드바 ───────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("📈 단타 트레이딩")
-    st.caption(f"프로그램 버전: **{__version__}**")
+    st.caption(f"프로그램 버전: **{getattr(daytrader, '__version__', '확인 불가 - 앱실행.bat으로 다시 켜세요')}**")
     st.caption("전략: 과매도 반등형 · 다음날 시가 매수 → 당일 종가 매도")
     market = st.selectbox("스캔 시장", ["ALL", "KOSPI", "KOSDAQ"], format_func=lambda m: {"ALL": "전체", "KOSPI": "코스피", "KOSDAQ": "코스닥"}[m])
     limit = st.select_slider("스캔 종목 수 (거래대금 상위)", options=[100, 200, 300, 500], value=300)
