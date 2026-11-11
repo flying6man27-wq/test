@@ -16,6 +16,7 @@ class Result:
     code: str
     name: str
     date: str
+    strategy: str
     close: float
     chg_pct: float
     score: float
@@ -28,7 +29,6 @@ class Result:
     vol_ratio: float
     atr_pct: float
     backtest: dict = field(default_factory=dict)
-    error: str | None = None
 
     def row(self) -> dict:
         return {
@@ -38,8 +38,7 @@ class Result:
             "RSI": round(self.rsi, 1), "거래량배수": round(self.vol_ratio, 2),
             "ATR%": round(self.atr_pct, 2),
             "거래대금(억)": round(self.amount / 1e8, 1),
-            "진입가": round(self.plan["진입가"], 2), "1차목표": round(self.plan["1차목표"], 2),
-            "손절가": round(self.plan["손절가"], 2),
+            "손절폭": round(self.plan["손절폭"], 2),
             "과거승률%": self.backtest.get("승률%"), "과거평균%": self.backtest.get("평균수익%"),
             "과거거래수": self.backtest.get("거래수"),
             "주요신호": ", ".join(self.signals_on),
@@ -47,27 +46,33 @@ class Result:
         }
 
 
-def analyze_df(code: str, name: str, df: pd.DataFrame, threshold: float = 55) -> Result:
+def analyze_df(code: str, name: str, df: pd.DataFrame,
+               strat: strategy.Strategy | None = None, threshold: float | None = None) -> Result:
+    strat = strat or strategy.get()
+    threshold = strat.default_threshold if threshold is None else threshold
     if len(df) < MIN_BARS:
         raise ValueError(f"데이터 부족 ({len(df)}일)")
     d = add_indicators(df)
-    sig = strategy.signal_frame(d)
-    score = strategy.score_series(sig)
+    sig = strat.signal_frame(d)
+    score = strat.score_series(sig)
     last, s_last = d.iloc[-1], sig.iloc[-1]
 
-    on = [strategy.LABELS[k] for k, w in strategy.WEIGHTS.items() if w > 0 and s_last[k]]
-    warn = [strategy.LABELS[k] for k, w in strategy.WEIGHTS.items() if w < 0 and s_last[k]]
-    trades = backtest.next_day_trades(d, score, threshold)
+    on = [strat.labels[k] for k, w in strat.weights.items() if w > 0 and s_last[k]]
+    warn = [strat.labels[k] for k, w in strat.weights.items() if w < 0 and s_last[k]]
+    if last.CHG_PCT >= 29:
+        warn.append("상한가 마감 (매수 불가 가능성)")
+    trades = backtest.next_day_trades(d, score, threshold, strategy.STOP_ATR)
     return Result(
-        code=code, name=name, date=d.index[-1].strftime("%Y-%m-%d"),
+        code=code, name=name, date=d.index[-1].strftime("%Y-%m-%d"), strategy=strat.name,
         close=last.Close, chg_pct=last.CHG_PCT, score=float(score.iloc[-1]),
-        grade=strategy.grade(score.iloc[-1]), signals_on=on, warnings=warn,
+        grade=strategy.grade(score.iloc[-1], threshold), signals_on=on, warnings=warn,
         plan=strategy.trade_plan(last), amount=last.AMOUNT, rsi=last.RSI,
         vol_ratio=last.VOL_RATIO, atr_pct=last.ATR_PCT,
         backtest=backtest.summarize(trades),
     )
 
 
-def analyze(symbol: str, threshold: float = 55) -> Result:
+def analyze(symbol: str, strat: strategy.Strategy | None = None,
+            threshold: float | None = None, days: int = 1100) -> Result:
     code, name = data.resolve(symbol)
-    return analyze_df(code, name, data.ohlcv(code), threshold)
+    return analyze_df(code, name, data.ohlcv(code, days), strat, threshold)

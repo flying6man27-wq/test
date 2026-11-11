@@ -1,12 +1,8 @@
-"""간이 백테스트: '점수가 기준 이상인 날 종가 신호 → 다음날 단타' 를 과거에 적용했으면?
+"""간이 백테스트: 점수 기준 이상인 날 → 다음날 '시가 매수 → 종가 매도'.
 
-규칙 (일봉만으로 하는 보수적 가정)
-- 다음날 시가 매수
-- 다음날 고가가 목표가(시가 + 0.5*ATR) 도달 → 목표가 매도 (익절)
-- 다음날 저가가 손절가(시가 - 0.5*ATR) 도달 → 손절가 매도
-- 둘 다 닿았으면 순서를 알 수 없으므로 손절로 처리 (보수적)
-- 둘 다 아니면 종가 매도
-- 왕복 거래비용 0.25% 차감 (수수료+거래세 근사)
+- 다음날 저가가 (시가 - stop_atr × ATR) 이하이면 그 가격에 손절 (일봉만 쓰므로 장중 순서는 알 수 없음)
+- 상한가 마감 종목은 제외 (실제로 살 수 없음)
+- 왕복 거래비용 0.25% 차감 (수수료 + 거래세 근사)
 """
 from __future__ import annotations
 
@@ -17,29 +13,31 @@ COST = 0.25  # %
 
 
 def next_day_trades(d: pd.DataFrame, score: pd.Series, threshold: float,
-                    tp_atr: float = 0.5, sl_atr: float = 0.5) -> pd.DataFrame:
-    nxt = d[["Open", "High", "Low", "Close"]].shift(-1)
-    sel = (score >= threshold) & nxt.Open.notna() & d.ATR.notna()
+                    stop_atr: float | None = 1.0) -> pd.DataFrame:
+    nxt = d[["Open", "Low", "Close"]].shift(-1)
+    sel = (score >= threshold) & nxt.Open.notna() & d.ATR.notna() & (d.CHG_PCT < 29)
     if not sel.any():
         return pd.DataFrame(columns=["ret", "result"])
-    o, h, l, c = (nxt.loc[sel, k] for k in ("Open", "High", "Low", "Close"))
-    atr = d.ATR[sel]
-    tp, sl = o + tp_atr * atr, o - sl_atr * atr
-    hit_tp, hit_sl = h >= tp, l <= sl
-    exit_px = np.where(hit_sl, sl, np.where(hit_tp, tp, c))
+    o, l, c = nxt.Open[sel], nxt.Low[sel], nxt.Close[sel]
+    if stop_atr:
+        sl = o - stop_atr * d.ATR[sel]
+        hit = l <= sl
+        exit_px = np.where(hit, sl, c)
+    else:
+        hit = pd.Series(False, index=o.index)
+        exit_px = c.values
     ret = (exit_px / o - 1) * 100 - COST
-    result = np.where(hit_sl, "손절", np.where(hit_tp, "익절", "종가청산"))
-    return pd.DataFrame({"ret": ret, "result": result}, index=o.index)
+    return pd.DataFrame({"ret": ret, "result": np.where(hit, "손절", "종가청산")}, index=o.index)
 
 
 def summarize(trades: pd.DataFrame) -> dict:
     n = len(trades)
     if n == 0:
-        return {"거래수": 0, "승률%": None, "평균수익%": None, "누적수익%": None}
+        return {"거래수": 0, "승률%": None, "평균수익%": None, "손절비율%": None}
     r = trades.ret
     return {
         "거래수": n,
         "승률%": float(round((r > 0).mean() * 100, 1)),
         "평균수익%": float(round(r.mean(), 2)),
-        "누적수익%": float(round(((1 + r / 100).prod() - 1) * 100, 1)),
+        "손절비율%": float(round((trades.result == "손절").mean() * 100, 1)),
     }

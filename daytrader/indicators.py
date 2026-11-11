@@ -18,6 +18,11 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     loss = (-delta.clip(upper=0)).ewm(alpha=1 / 14, adjust=False).mean()
     d["RSI"] = 100 - 100 / (1 + gain / loss.replace(0, np.nan))
 
+    # RSI(2) - 초단기 과매도 측정
+    g2 = delta.clip(lower=0).ewm(alpha=1 / 2, adjust=False).mean()
+    l2 = (-delta.clip(upper=0)).ewm(alpha=1 / 2, adjust=False).mean()
+    d["RSI2"] = 100 - 100 / (1 + g2 / l2.replace(0, np.nan))
+
     # MACD(12,26,9)
     ema12, ema26 = c.ewm(span=12, adjust=False).mean(), c.ewm(span=26, adjust=False).mean()
     d["MACD"] = ema12 - ema26
